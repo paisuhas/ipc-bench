@@ -41,14 +41,20 @@ for s in target_args:
 		target_cores.append((next_core, s))
 		next_core = None
 
-chunk_repeats = [("64", "1000000"), ("4096", "1000000"), ("65536", "100000")]
+chunk_repeats = [("64","1000000"), ("256","1000000"), ("1024","1000000"), ("4096","1000000"), ("16384","1000000"), ("65536","1000000"), ("262144","1000000"), ("524288","1000000")]
 
+"""
+chunk_repeats = [("64", "1000000"), ("4096", "1000000"), ("65536", "100000")]
 test_rips = [("pipe_thr", True), ("unix_thr", True), 
              ("tcp_thr", True), ("tcp_nodelay_thr", True),
              ("vmsplice_coop_pipe_thr", True), 
              ("mempipe_thr", True), ("mempipe_thr", False),
              ("mempipe_spin_thr", True), ("mempipe_spin_thr", False), 
              ("shmem_pipe_thr", True), ("shmem_pipe_thr", False)]
+test_rips = [("pipe_thr", True), 
+             ("tcp_thr", True), ("tcp_nodelay_thr", True)]
+"""
+test_rips = [("mmap_thr", True), ("pipe_thr", True)]
 
 tests_done = set()
 

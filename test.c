@@ -106,7 +106,7 @@ static int repmemcmp(void* buf, int byte, size_t count) {
 #endif
 }
 
-void parent_main(test_t* test, test_data* td, int is_latency_test) {
+void parent_main(test_t* test, test_data* td, int is_latency_test, pid_t child_pid) {
 
   char* private_buffer = xmalloc(td->size);
   struct timeval start;
@@ -174,7 +174,7 @@ void parent_main(test_t* test, test_data* td, int is_latency_test) {
       test->release_write_buffer(td, write_bufs, n_write_bufs);
     }
     else {
-      test->parent_ping(td);
+      test->parent_ping(td, child_pid);
     }
 
     if(td->per_iter_timings)
@@ -312,7 +312,7 @@ run_test(int argc, char *argv[], test_t *test)
 					anything. */
 	td->name = test->name;
         setaffinity(second_cpu);
-	parent_main(test, td, test->is_latency_test);
+	parent_main(test, td, test->is_latency_test, pid2);
 
 	wait_for_children_to_finish();
 

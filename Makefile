@@ -19,10 +19,10 @@ CFLAGS += -g -Wall -O3 -D_GNU_SOURCE -DNDEBUG -std=gnu99 $(CFLAGS_$(uname))
 LDFLAGS_Linux := -lrt -lnuma
 LDFLAGS += -lm $(LDFLAGS_$(uname))
 
-TARGETS_POSIX := pipe_thr tcp_thr tcp_nodelay_thr unix_thr mempipe_spin_thr
+TARGETS_POSIX := pipe_thr tcp_thr tcp_nodelay_thr unix_thr mempipe_spin_thr mmap_lat mmap_thr
 TARGETS_Linux += mempipe_thr vmsplice_pipe_thr vmsplice_hugepages_pipe_thr vmsplice_hugepages_coop_pipe_thr vmsplice_coop_pipe_thr
 
-TARGETS_POSIX += pipe_lat unix_lat tcp_lat tcp_nodelay_lat mempipe_lat
+TARGETS_POSIX += pipe_lat unix_lat tcp_lat tcp_nodelay_lat mempipe_lat mmap_lat mmap_thr
 TARGETS_Linux += shmem_pipe_thr futex_lat
 
 TARGETS_POSIX += summarise_tsc_counters

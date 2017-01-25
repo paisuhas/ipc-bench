@@ -71,7 +71,7 @@ child_ping(test_data *td)
 }
 
 static void
-parent_ping(test_data *td)
+parent_ping(test_data *td, pid_t child_pid)
 {
   test_state *ps = (test_state *)td->data;
   xwrite(ps->sv[0], ps->buf, td->size);

@@ -9,7 +9,7 @@ import shutil
 import re
 import json
 import getpass
-from restkit import Resource, BasicAuth
+#from restkit import Resource, BasicAuth
 
 owner = "avsm" # github user name of the official trunk repo
 

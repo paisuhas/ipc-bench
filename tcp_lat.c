@@ -132,7 +132,7 @@ init_parent(test_data *td)
   ts->fd = sockfd;
 }
 
-static void parent_ping(test_data* td) {
+static void parent_ping(test_data* td, pid_t child_pid) {
   struct tcp_state* ts = (struct tcp_state*)td->data;
   xwrite(ts->fd, ts->buf, td->size);
   xread(ts->fd, ts->buf, td->size);

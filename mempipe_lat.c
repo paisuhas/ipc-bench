@@ -84,7 +84,7 @@ parent_init(test_data *td)
     ;
 }
 
-static void parent_ping(test_data* td) {
+static void parent_ping(test_data* td, pid_t child_pid) {
 
   volatile struct shared_page *sp = td->data;
 

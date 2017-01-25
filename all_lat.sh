@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-SIZES="128"
+SIZES="4 16 64 256 1024 4096 16384 65536 262144 524288"
 COUNT=10000
-LAT_TESTS="pipe_lat tcp_lat unix_lat mempipe_lat tcp_nodelay_lat"
+#LAT_TESTS="pipe_lat tcp_lat unix_lat mempipe_lat tcp_nodelay_lat"
+#LAT_TESTS="pipe_lat tcp_lat tcp_nodelay_lat"
+LAT_TESTS="mmap_lat pipe_lat"
 TESTS="${LAT_TESTS}"
 
 NUM_CORES=$2
