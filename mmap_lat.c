@@ -45,67 +45,102 @@
 #include <fcntl.h>
 #include <signal.h>
 
-void Mutex_init(pthread_mutex_t *m) {                                              
-  if (pthread_mutex_init(m, NULL) < 0)                                             
-    unix_error("Mutex init failed");                                               
+void Mutex_init(pthread_mutex_t *m, pthread_mutexattr_t *ma) {                                              
+  if (pthread_mutex_init(m, ma) < 0)                                             
+    err(1, "Mutex init failed");                                               
 }                                                                                  
                                                                                    
 void Mutex_lock(pthread_mutex_t *m) {                                              
   int rc = pthread_mutex_lock(m);                                                  
   if (rc < 0)                                                                      
-    unix_error("Mutex lock failed");                                               
+    err(1, "Mutex lock failed");                                               
 }                                                                                  
                                                                                    
 void Mutex_unlock(pthread_mutex_t *m) {                                            
   int rc = pthread_mutex_unlock(m);                                                
   if (rc < 0)                                                                      
-    unix_error("Mutex unlock failed");                                             
+    err(1, "Mutex unlock failed");                                             
 }                                                                                  
                                                                                    
-void Cond_init(pthread_cond_t *c) {                                                
-  if(pthread_cond_init(c, NULL) < 0)                                               
-    unix_error("CV init failed");                                                  
+void Cond_init(pthread_cond_t *c, pthread_condattr_t *ca) {                                                
+  if(pthread_cond_init(c, ca) < 0)                                               
+    err(1, "CV init failed");                                                  
 }                                                                                  
                                                                                    
 void Cond_wait(pthread_cond_t *c, pthread_mutex_t *m) {                            
   int rc = pthread_cond_wait(c, m);                                                
   if (rc < 0)                                                                      
-    unix_error("CV wait failed");                                                  
+    err(1, "CV wait failed");                                                  
 }                                                                                  
                                                                                    
 void Cond_signal(pthread_cond_t *c) {                                              
   int rc = pthread_cond_signal(c);                                                 
   if (rc < 0)                                                                      
-    unix_error("CV wait failed");                                                  
+    err(1, "CV wait failed");                                                  
 }                                      
 
-pthread_cond_t empty, fill;
-pthread_mutex_t m;
+pthread_cond_t* empty, full;
+pthread_mutex_t* m;
+int request;
 
 typedef struct {
-  int ifds[2];
-  int ofds[2];
-  void* buf;
-} pipe_state;
+  void* cbuf;
+  void* pbuf;
+} mem_state;
 
-static void
-sigHandler(int sig)
-{
-}
+mem_state mems;
+
+int sfd;
+
+  int des_cond, des_msg, des_mutex;
 
 static void
 init_test(test_data *td)
 {
+ 
+  int mode = S_IRWXU | S_IRWXG;
   int *addr;                  /* Pointer to shared memory region */
-  empty  = (pthread_cond_t)PTHREAD_COND_INITIALIZER;                               
-  fill   = (pthread_cond_t)PTHREAD_COND_INITIALIZER;                               
-  m      = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+  des_mutex = shm_open("/tmp/mutex", O_CREAT | O_RDWR | O_TRUNC, mode);
+
+  if (des_mutex < 0)
+  {
+    perror("failure on shm_open on des_mutex");
+    exit(1);
+  }
+  
+  des_cond = shm_open("/tmp/cond", O_CREAT | O_RDWR | O_TRUNC, mode);
+  if (des_cond < 0)
+  {
+    perror("failure on shm_open on des_cond");
+    exit(1);
+  }
+  des_msg = shm_open("/tmp/cond1", O_CREAT | O_RDWR | O_TRUNC, mode);
+  if (des_cond < 0)
+  {
+    perror("failure on shm_open on des_cond");
+    exit(1);
+  } empty  = (pthread_cond_t*) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, des_cond, 0);
+  full   = (pthread_cond_t*) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, des_msg, 0);                              
+  m      = (pthread_mutex_t*) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, des_mutex, 0);
+  pthread_mutexattr_t* ma;
+  pthread_mutexattr_setpshared(ma, PTHREAD_PROCESS_SHARED);
+  pthread_condattr_t* ca;
+  pthread_condattr_setpshared(ca, PTHREAD_PROCESS_SHARED);
+  Mutex_init(m,ma);
+  Cond_init(empty,ca);
+  Cond_init(full,ca);
+  
+  sfd = open("/smem", O_RDWR,  mode);
+
   addr = mmap(NULL, td->size, PROT_READ | PROT_WRITE,
-      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+      MAP_SHARED | MAP_ANONYMOUS, sfd, 0);
   if (addr == MAP_FAILED){
     err(1, "MAP FAILED");
   }
   td->data = (void *)addr;
+  mems.cbuf = xmalloc(td->size); 
+  mems.pbuf = xmalloc(td->size); 
+  request = 0;
 }
 
 static void
@@ -116,47 +151,21 @@ local_init(test_data *td)
 static void
 child_ping(test_data *td)
 {
-//  int fd;
-//  fd = open("/dev/zero", O_RDWR);
-//  if (fd < 0)
-//    err(1, "open");
-  pid_t parent_pid = getppid();
-  void *buf = xmalloc(td->size);
-  if(kill(parent_pid, SIGHUP) == -1)
-    err(1, "signal from child to parent");
-  memcpy(buf, td->data, td->size);
-  //xread(fd, td->data, td->size);
-  if(kill(parent_pid, SIGHUP) == -1)
-    err(1, "signal from child to parent");
-  memset(td->data, -1, td->size);
-  //xwrite(fd, td->data, td->size); 
-//  if (close(fd) < 0)
-//    err(1, "close");
+  Mutex_lock(m);
+  Cond_wait(full, m);
+  memcpy(mems.cbuf, td->data, td->size);
+  memset(td->data, 1, td->size);
+  Cond_signal(&empty);
 }
 
 static void
 parent_ping(test_data *td, pid_t child_pid)
 {
-  /*
-  pipe_state *ps = (pipe_state *)td->data;
-  xwrite(ps->ifds[1], ps->buf, td->size); 
-  xread(ps->ofds[0], ps->buf, td->size);
-  */
-//  int fd;
-//  fd = open("/dev/zero", O_RDWR);
-//  if (fd < 0)
-//    err(1, "open");
-  void *buf = xmalloc(td->size);
-  pause();
-  memset(td->data, -1, td->size);
-  //xwrite(fd, td->data, td->size); 
-  if(kill(child_pid, SIGHUP) == -1)
-    err(1, "signal from parent to child");
-  pause();
-  memcpy(buf, td->data, td->size);
-  //xread(fd, td->data, td->size);
-//  if (close(fd) < 0)
-//    err(1, "close");
+  Mutex_lock(m);                                                                
+  memset(td->data, 1, td->size);
+  Cond_signal(full);
+  Cond_wait(empty, m);                                                       
+  memcpy(mems.pbuf, td->data, td->size);
 }
 
 int
@@ -170,10 +179,11 @@ main(int argc, char *argv[])
 	       .parent_ping = parent_ping,
 	       .child_ping = child_ping
   };
-  if (signal(SIGHUP, sigHandler) == SIG_ERR)
-    err(1, "sigHandler");
   run_test(argc, argv, &t);
-  return 0;
+  shm_unlink("/tmp/mutex");
+  shm_unlink("/tmp/cond");
+   shm_unlink("/tmp/cond1");
+   return 0;
 }
 
 //int
