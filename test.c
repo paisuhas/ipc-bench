@@ -35,6 +35,7 @@
 #include <err.h>
 #include <inttypes.h>
 #include <netdb.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -109,8 +110,8 @@ static int repmemcmp(void* buf, int byte, size_t count) {
 void parent_main(test_t* test, test_data* td, int is_latency_test, pid_t child_pid) {
 
   char* private_buffer = xmalloc(td->size);
-  struct timeval start;
-  struct timeval stop;						
+  struct timespec start;
+  struct timespec stop;						
   unsigned long *iter_cycles;						
   unsigned long delta;	
   unsigned long t = 0;
@@ -128,7 +129,8 @@ void parent_main(test_t* test, test_data* td, int is_latency_test, pid_t child_p
       err(1, "calloc");						
   }									
 									
-  gettimeofday(&start, NULL);						
+  // gettimeofday(&start, NULL);						
+  clock_gettime(CLOCK_MONOTONIC, &start);
   for (int i = 0; i < td->count; i++) {	
     if(td->per_iter_timings)
       t = rdtsc();
@@ -184,16 +186,16 @@ void parent_main(test_t* test, test_data* td, int is_latency_test, pid_t child_p
   if(test->finish_parent)
     test->finish_parent(td);
 
-  gettimeofday(&stop, NULL);						
-									
-  delta = ((stop.tv_sec - start.tv_sec) * (int64_t) 1000000 +		
-	   stop.tv_usec - start.tv_usec);				
+  // gettimeofday(&stop, NULL);						
+  clock_gettime(CLOCK_MONOTONIC, &stop);									
+  delta = ((stop.tv_sec - start.tv_sec) * (int64_t) 1000000000 +		
+	   stop.tv_nsec - start.tv_nsec);				
 									
   if (is_latency_test)								
     logmsg(td,							
 	   "headline",						
-	   "%s %d %" PRIu64 " %fs\n", td->name, td->size, td->count,
-	   delta / (td->count * 1e6));				
+	   "%s %d %" PRIu64 " %2.9lfs\n", td->name, td->size, td->count,
+	   delta / (td->count * 1e9));				
   else								
     logmsg(td,							
 	   "headline",						
@@ -201,7 +203,7 @@ void parent_main(test_t* test, test_data* td, int is_latency_test, pid_t child_p
 	   td->numa_node,
 	   td->size, 
 	   td->produce_method, td->write_in_place, td->read_in_place, td->do_verify, td->count,							
-	   ((((td->count * (int64_t)1e6) / delta) * td->size * 8) / (int64_t) 1e6)); 
+	   ((((td->count * (int64_t)1e9) / delta) * td->size * 8) / (int64_t) 1e9)); 
 									
   if (td->per_iter_timings)						
     dump_tsc_counters(td, iter_cycles, td->count);
