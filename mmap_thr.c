@@ -55,9 +55,8 @@ sem_t *mutex;
 int request;
 
 typedef struct {
-  void* cbuf;
-  void* pbuf;
-  struct iovec buffer;
+  struct iovec rbuf;
+  struct iovec wbuf;
 } mem_state;
 
 mem_state mems;
@@ -85,26 +84,28 @@ init_test(test_data *td)
   }
 
   td->data = (void *)addr;
-  mems.cbuf = xmalloc(td->size); 
-  mems.pbuf = xmalloc(td->size); 
+  mems.rbuf.iov_base = xmalloc(td->size); 
+  mems.wbuf.iov_base = xmalloc(td->size); 
+  mems.rbuf.iov_len = td->size;
+  mems.wbuf.iov_len = td->size;
+  printf("Read buf is at %p\n", mems.rbuf.iov_base);
+  printf("Write buf is at %p\n", mems.wbuf.iov_base);
 }
 
 static void
 init_local(test_data *td)
 {
-  mems.buffer.iov_base = xmalloc(td->size);
-  mems.buffer.iov_len = td->size;
-  for (int i = 0; i < td->count; i++)
-    memset(mems.buffer.iov_base, (char)i, mems.buffer.iov_len);
 }
 
 static struct iovec*
 get_read_buf(test_data *td, int len, int* n_vecs)
 {
   sem_wait(mutex);                                                       
-  memcpy(mems.buffer.iov_base, td->data, td->size);
+  printf("Child: Reading to %p\n", mems.rbuf.iov_base);
+  memcpy(mems.rbuf.iov_base, td->data, td->size);
+  sem_post(mutex);
   *n_vecs = 1;
-  return &mems.buffer;
+  return &mems.rbuf;
 }
 
 static void
@@ -116,15 +117,18 @@ release_read_buf(test_data *td, struct iovec* vecs, int n_vecs) {
 static struct iovec* get_write_buf(test_data *td, int len, int* n_vecs) {
   assert(len == td->size);
   *n_vecs = 1;
-  return &mems.buffer;
+  return &mems.wbuf;
 }
 
 static void
 release_write_buf(test_data *td, struct iovec* vecs, int n_vecs)
 {
   assert(vecs == &mems.buffer && n_vecs == 1);
+  assert(vecs[0].iov_base == &mems.buffer.iov_base && n_vecs == 1);
+  printf("Parent: Writing to %p\n", mems.wbuf.iov_base);
   memcpy(td->data, vecs[0].iov_base, vecs[0].iov_len);
   sem_post(mutex);
+  sem_wait(mutex);                                                       
 }
 
 int
