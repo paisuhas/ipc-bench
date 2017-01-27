@@ -69,13 +69,13 @@ init_test(test_data *td)
 {
  
   int *addr;                  /* Pointer to shared memory region */
-  if ((mutex = sem_open(SEMNAME, O_CREAT|O_EXCL|O_RDWR, 0644, 1))               
+  if ((mutex = sem_open(SEMNAME, O_CREAT|O_RDWR, 0644, 1))
       == SEM_FAILED) {                                                          
     err(1, "sem_open");                                                       
     sem_unlink(SEMNAME);                                                        
     exit(1);                                                                    
   }                  
-  sfd = open("/tmp/smem_thr", O_RDWR, S_IRWXU | S_IRWXG);
+  sfd = open("/smem", O_RDWR, S_IRWXU | S_IRWXG);
 
   addr = mmap(NULL, td->size, PROT_READ | PROT_WRITE,
       MAP_SHARED | MAP_ANONYMOUS, sfd, 0);
@@ -94,6 +94,8 @@ init_local(test_data *td)
 {
   mems.buffer.iov_base = xmalloc(td->size);
   mems.buffer.iov_len = td->size;
+  for (int i = 0; i < td->count; i++)
+    memset(mems.buffer.iov_base, (char)i, mems.buffer.iov_len);
 }
 
 static struct iovec*
